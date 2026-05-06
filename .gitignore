@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+
+# uv
+.uv/
+
+# Secrets & tokens
+.env
+.env.local
+tokens.json
+*.pem
+
+# Data
+data/raw/
+data/*.duckdb
+data/*.duckdb.wal
+data/warehouse.duckdb*
+*.parquet
+
+# Editors
+.vscode/
+.idea/
+.DS_Store
+
+# Jupyter
+.ipynb_checkpoints/

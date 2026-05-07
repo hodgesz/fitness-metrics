@@ -11,7 +11,10 @@ VIEWS = r"""
 -- (HR_rest=50, HR_max=190) since the API doesn't give us thresholds.
 CREATE OR REPLACE VIEW v_activity_combined AS
 WITH hr_model AS (
-    SELECT 50.0 AS hr_rest, 190.0 AS hr_max
+    -- HR_min is the "looks like a real reading" threshold. Strava occasionally
+    -- reports bogus values like 1.0 when an HR sensor drops, and we'd rather
+    -- fall back to Whoop strain than trust those.
+    SELECT 50.0 AS hr_rest, 190.0 AS hr_max, 40.0 AS hr_min
 )
 SELECT
     s.id                              AS strava_id,
@@ -31,12 +34,12 @@ SELECT
     s.kilojoules                      AS kilojoules,
     s.device_watts                    AS has_device_power,
     s.trainer                         AS is_trainer,
-    -- TRIMP, only where HR is known
-    CASE WHEN s.average_heartrate IS NOT NULL AND s.moving_time > 0 THEN
+    -- TRIMP, only where HR is known AND looks plausible (> hr_min).
+    CASE WHEN s.average_heartrate > (SELECT hr_min FROM hr_model) AND s.moving_time > 0 THEN
         (s.moving_time / 60.0)
-        * ((s.average_heartrate - (SELECT hr_rest FROM hr_model))
+        * GREATEST(0, (s.average_heartrate - (SELECT hr_rest FROM hr_model))
             / ((SELECT hr_max FROM hr_model) - (SELECT hr_rest FROM hr_model)))
-        * EXP(1.92 * ((s.average_heartrate - (SELECT hr_rest FROM hr_model))
+        * EXP(1.92 * GREATEST(0, (s.average_heartrate - (SELECT hr_rest FROM hr_model))
             / ((SELECT hr_max FROM hr_model) - (SELECT hr_rest FROM hr_model))))
     END AS trimp,
     -- Link + Whoop fields (NULL if not linked)
@@ -47,7 +50,23 @@ SELECT
     w.average_hr                      AS whoop_avg_hr,
     w.max_hr                          AS whoop_max_hr,
     w.kilojoule                       AS whoop_kilojoules,
-    w.distance_meter                  AS whoop_distance_m
+    w.distance_meter                  AS whoop_distance_m,
+    -- TRIMP with Whoop strain fallback. 12.36 is the best-fit scaling from
+    -- paired sessions (see analysis in commit adding this column).
+    CASE
+        WHEN s.average_heartrate > (SELECT hr_min FROM hr_model) AND s.moving_time > 0 THEN
+            (s.moving_time / 60.0)
+            * GREATEST(0, (s.average_heartrate - (SELECT hr_rest FROM hr_model))
+                / ((SELECT hr_max FROM hr_model) - (SELECT hr_rest FROM hr_model)))
+            * EXP(1.92 * GREATEST(0, (s.average_heartrate - (SELECT hr_rest FROM hr_model))
+                / ((SELECT hr_max FROM hr_model) - (SELECT hr_rest FROM hr_model))))
+        WHEN w.strain IS NOT NULL THEN 12.36 * w.strain
+    END AS trimp_estimate,
+    CASE
+        WHEN s.average_heartrate > (SELECT hr_min FROM hr_model) THEN 'hr'
+        WHEN w.strain IS NOT NULL THEN 'whoop_strain'
+        ELSE NULL
+    END AS trimp_source
 FROM strava_activities s
 LEFT JOIN activity_links l ON l.strava_activity_id = s.id
 LEFT JOIN whoop_workouts w ON w.id = l.whoop_workout_id;
@@ -62,7 +81,7 @@ CREATE OR REPLACE VIEW v_daily_load AS
 WITH daily AS (
     SELECT
         activity_date,
-        SUM(COALESCE(trimp, 0))         AS day_trimp,
+        SUM(COALESCE(trimp_estimate, 0)) AS day_trimp,
         SUM(COALESCE(whoop_strain, 0))  AS day_whoop_strain,
         SUM(distance_m)                 AS day_distance_m,
         SUM(moving_s)                   AS day_moving_s,

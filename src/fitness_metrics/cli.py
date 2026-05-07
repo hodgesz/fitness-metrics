@@ -97,11 +97,25 @@ def link() -> None:
 @click.option("--skip-whoop", is_flag=True)
 @click.option("--skip-strava", is_flag=True)
 @click.option("--skip-link", is_flag=True)
-def sync(skip_whoop: bool, skip_strava: bool, skip_link: bool) -> None:
+@click.option(
+    "--skip-if-within",
+    type=int,
+    default=None,
+    metavar="MINUTES",
+    help="Exit early if both providers were synced successfully within this window.",
+)
+def sync(
+    skip_whoop: bool, skip_strava: bool, skip_link: bool, skip_if_within: int | None
+) -> None:
     """Incremental sync from both providers, then re-link."""
     from fitness_metrics.sync import run
 
-    run(skip_whoop=skip_whoop, skip_strava=skip_strava, skip_link=skip_link)
+    run(
+        skip_whoop=skip_whoop,
+        skip_strava=skip_strava,
+        skip_link=skip_link,
+        skip_if_within_minutes=skip_if_within,
+    )
 
 
 if __name__ == "__main__":

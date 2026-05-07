@@ -124,8 +124,35 @@ def _record_run(provider: str, status: str, notes: str) -> None:
         )
 
 
-def run(*, skip_whoop: bool = False, skip_strava: bool = False, skip_link: bool = False) -> None:
+def _last_successful_sync(provider: str) -> datetime | None:
+    with connect() as con:
+        row = con.execute(
+            "SELECT MAX(finished_at) FROM sync_runs WHERE provider = ? AND status = 'ok'",
+            [provider],
+        ).fetchone()
+    return row[0] if row and row[0] else None
+
+
+def run(
+    *,
+    skip_whoop: bool = False,
+    skip_strava: bool = False,
+    skip_link: bool = False,
+    skip_if_within_minutes: int | None = None,
+) -> None:
     init_schema()
+
+    if skip_if_within_minutes:
+        now = datetime.now(UTC).replace(tzinfo=None)
+        cutoff = now - timedelta(minutes=skip_if_within_minutes)
+        last_whoop = _last_successful_sync("whoop")
+        last_strava = _last_successful_sync("strava")
+        if last_whoop and last_strava and last_whoop >= cutoff and last_strava >= cutoff:
+            console.print(
+                f"[yellow]Last sync was within {skip_if_within_minutes} min "
+                f"(whoop={last_whoop}, strava={last_strava}); skipping.[/yellow]"
+            )
+            return
 
     if not skip_whoop:
         console.print("[bold]Syncing Whoop…[/bold]")

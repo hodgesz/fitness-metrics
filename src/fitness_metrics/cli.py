@@ -44,6 +44,21 @@ def refresh_views() -> None:
     console.print("[green]Views refreshed.[/green]")
 
 
+@cli.command()
+@click.option("--port", type=int, default=8501, show_default=True)
+def dashboard(port: int) -> None:
+    """Launch the Streamlit dashboard at http://localhost:<port>."""
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    script = Path(__file__).parent / "dashboard.py"
+    subprocess.run(
+        [sys.executable, "-m", "streamlit", "run", str(script), "--server.port", str(port)],
+        check=True,
+    )
+
+
 @cli.group()
 def auth() -> None:
     """OAuth: authorize providers once; tokens are cached locally."""

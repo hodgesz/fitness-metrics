@@ -24,6 +24,9 @@ data/*.duckdb.wal
 data/warehouse.duckdb*
 *.parquet
 
+# Generated reports (personal health data: HR, GPS, power)
+reports/
+
 # Editors
 .vscode/
 .idea/

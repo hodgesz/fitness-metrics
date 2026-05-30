@@ -24,10 +24,12 @@ console = Console()
 WHOOP_RAW = RAW_DIR / "whoop"
 
 # Whoop: 100 req/min, 10k/day.
-RATE = RateLimiter([
-    RollingWindow(limit=100, seconds=60),
-    RollingWindow(limit=10_000, seconds=24 * 60 * 60),
-])
+RATE = RateLimiter(
+    [
+        RollingWindow(limit=100, seconds=60),
+        RollingWindow(limit=10_000, seconds=24 * 60 * 60),
+    ]
+)
 
 # Start date for backfill — user confirmed ~1 year of data; we over-pull to be safe.
 EARLIEST = datetime(2024, 1, 1, tzinfo=UTC)
@@ -173,12 +175,16 @@ def run() -> None:
     start = EARLIEST
     end = datetime.now(UTC) + timedelta(days=1)
 
-    with client() as c, Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        TimeElapsedColumn(),
-        console=console,
-    ) as progress, connect() as con:
+    with (
+        client() as c,
+        Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            TimeElapsedColumn(),
+            console=console,
+        ) as progress,
+        connect() as con,
+    ):
         for label, path, extractor, table, cols, pk in [
             ("cycles", CYCLE_PATH, _cycle_row, "whoop_cycles", 11, ["id"]),
             ("recoveries", RECOVERY_PATH, _recovery_row, "whoop_recoveries", 12, ["cycle_id"]),

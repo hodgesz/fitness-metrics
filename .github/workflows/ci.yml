@@ -24,10 +24,10 @@ jobs:
         run: uv sync --locked
 
       - name: Lint (ruff)
-        run: uvx ruff check .
+        run: uv run ruff check .
 
       - name: Format check (ruff)
-        run: uvx ruff format --check .
+        run: uv run ruff format --check .
 
       - name: Tests (pytest)
         run: |

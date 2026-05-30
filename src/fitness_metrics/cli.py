@@ -119,9 +119,7 @@ def link() -> None:
     metavar="MINUTES",
     help="Exit early if both providers were synced successfully within this window.",
 )
-def sync(
-    skip_whoop: bool, skip_strava: bool, skip_link: bool, skip_if_within: int | None
-) -> None:
+def sync(skip_whoop: bool, skip_strava: bool, skip_link: bool, skip_if_within: int | None) -> None:
     """Incremental sync from both providers, then re-link."""
     from fitness_metrics.sync import run
 

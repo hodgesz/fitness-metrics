@@ -103,11 +103,21 @@ def _render_load(load: pd.DataFrame) -> None:
             tooltip=["activity_date:T", "day_trimp:Q", "n_activities:Q"],
         )
     )
-    ctl = alt.Chart(df).mark_line(color="#2563eb", strokeWidth=2).encode(
-        x="activity_date:T", y=alt.Y("ctl_42d:Q", title="CTL (42d)"),
+    ctl = (
+        alt.Chart(df)
+        .mark_line(color="#2563eb", strokeWidth=2)
+        .encode(
+            x="activity_date:T",
+            y=alt.Y("ctl_42d:Q", title="CTL (42d)"),
+        )
     )
-    atl = alt.Chart(df).mark_line(color="#dc2626", strokeWidth=1.5).encode(
-        x="activity_date:T", y="atl_7d:Q",
+    atl = (
+        alt.Chart(df)
+        .mark_line(color="#dc2626", strokeWidth=1.5)
+        .encode(
+            x="activity_date:T",
+            y="atl_7d:Q",
+        )
     )
     form_area = (
         alt.Chart(df)
@@ -148,9 +158,9 @@ def _render_recovery_vs_load(feats: pd.DataFrame) -> None:
         )
         .properties(height=320)
     )
-    trend = chart.transform_regression(
-        "prev_day_trimp", "recovery_score"
-    ).mark_line(color="#64748b")
+    trend = chart.transform_regression("prev_day_trimp", "recovery_score").mark_line(
+        color="#64748b"
+    )
     st.altair_chart(chart + trend, use_container_width=True)
 
 

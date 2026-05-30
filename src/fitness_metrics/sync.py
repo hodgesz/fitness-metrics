@@ -44,12 +44,25 @@ def _sync_whoop() -> dict:
     with connect() as con, whoop_client() as c:
         for label, path, extractor, table, cols, pk, ts_col in [
             ("cycles", CYCLE_PATH, whoop_backfill._cycle_row, "whoop_cycles", 11, ["id"], "start"),
-            ("recoveries", RECOVERY_PATH, whoop_backfill._recovery_row,
-             "whoop_recoveries", 12, ["cycle_id"], "created_at"),
-            ("sleeps", SLEEP_PATH, whoop_backfill._sleep_row,
-             "whoop_sleeps", 12, ["id"], "start"),
-            ("workouts", WORKOUT_PATH, whoop_backfill._workout_row,
-             "whoop_workouts", 15, ["id"], "start"),
+            (
+                "recoveries",
+                RECOVERY_PATH,
+                whoop_backfill._recovery_row,
+                "whoop_recoveries",
+                12,
+                ["cycle_id"],
+                "created_at",
+            ),
+            ("sleeps", SLEEP_PATH, whoop_backfill._sleep_row, "whoop_sleeps", 12, ["id"], "start"),
+            (
+                "workouts",
+                WORKOUT_PATH,
+                whoop_backfill._workout_row,
+                "whoop_workouts",
+                15,
+                ["id"],
+                "start",
+            ),
         ]:
             latest = _high_water(con, f'SELECT MAX("{ts_col}") FROM {table}')
             if latest is None:
@@ -82,7 +95,8 @@ def _sync_strava() -> dict:
         summaries: list[dict] = []
         while True:
             r = strava_backfill._get(
-                c, "/athlete/activities",
+                c,
+                "/athlete/activities",
                 params={"after": after, "page": page, "per_page": per_page},
             )
             batch = r.json()
@@ -101,9 +115,7 @@ def _sync_strava() -> dict:
             if detail is None:
                 continue
             streams = strava_backfill.fetch_streams(c, aid)
-            existing = con.execute(
-                "SELECT 1 FROM strava_activities WHERE id = ?", [aid]
-            ).fetchone()
+            existing = con.execute("SELECT 1 FROM strava_activities WHERE id = ?", [aid]).fetchone()
             strava_backfill._upsert_activity(con, detail)
             strava_backfill._upsert_streams(con, aid, streams)
             if existing:
@@ -175,6 +187,7 @@ def run(
     if not skip_link:
         console.print("[bold]Re-linking…[/bold]")
         from fitness_metrics.link import run as link_run
+
         link_run(verbose=False)
 
     console.print("[green]Sync complete.[/green]")

@@ -41,10 +41,12 @@ STREAM_KEYS = [
 
 # Strava: 200/15min overall, 2000/day overall, 100/15min non-upload read, 1000/day read.
 # Daily limit resets at 00:00 UTC; 15-min is rolling.
-RATE = RateLimiter([
-    RollingWindow(limit=100, seconds=15 * 60),
-    DailyUtcWindow(limit=1000),
-])
+RATE = RateLimiter(
+    [
+        RollingWindow(limit=100, seconds=15 * 60),
+        DailyUtcWindow(limit=1000),
+    ]
+)
 
 
 def _get(
@@ -200,14 +202,17 @@ def run(limit: int | None = None) -> None:
         else:
             console.print(f"[bold]Found {total} activities. Hydrating…[/bold]")
 
-        with connect() as con, Progress(
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
-            MofNCompleteColumn(),
-            TimeElapsedColumn(),
-            TimeRemainingColumn(),
-            console=console,
-        ) as progress:
+        with (
+            connect() as con,
+            Progress(
+                TextColumn("[progress.description]{task.description}"),
+                BarColumn(),
+                MofNCompleteColumn(),
+                TimeElapsedColumn(),
+                TimeRemainingColumn(),
+                console=console,
+            ) as progress,
+        ):
             task = progress.add_task("hydrate", total=len(summaries))
             skipped = 0
             for s in summaries:

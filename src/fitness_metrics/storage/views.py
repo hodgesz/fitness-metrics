@@ -184,5 +184,6 @@ LEFT JOIN cycle_strain cs ON cs.d = l.activity_date;
 
 def install_views() -> None:
     from fitness_metrics.storage.schema import connect
+
     with connect() as con:
         con.execute(VIEWS)

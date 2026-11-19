@@ -1,0 +1,94 @@
+name: Gemini PR review
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  pull_request_target:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review, edited]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Open internal PR with a published owner Gemini receipt
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  review-protocol:
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22.22.2
+      - name: Test review protocol offline
+        run: node --test tests/review/*.test.mjs
+
+  verify-gemini-review:
+    concurrency:
+      group: gemini-receipt-${{ github.event.pull_request.number || inputs.pr_number || github.run_id }}
+      cancel-in-progress: true
+    permissions:
+      contents: read
+      pull-requests: read
+      statuses: write
+    if: >-
+      (github.event_name == 'pull_request_target' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.base.ref == 'main') ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      # Both supported events take their control workflow from trusted main/base.
+      # After local publication or dismissal, coordinator dispatches a fresh verifier.
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.sha }}
+          path: trusted
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22.22.2
+      - name: Resolve current exact internal PR identity
+        id: identity
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUM: ${{ github.event.pull_request.number || inputs.pr_number }}
+          REVIEW_REPO: ${{ github.repository }}
+          EXPECTED_BASE: ${{ github.event.pull_request.base.sha }}
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          FLAGS=()
+          if [ -n "$EXPECTED_BASE" ]; then FLAGS+=(--base "$EXPECTED_BASE" --head "$EXPECTED_HEAD"); fi
+          node trusted/scripts/agy-pr-review.mjs inspect --repo "$REVIEW_REPO" --pr "$PR_NUM" "${FLAGS[@]}"
+      - name: Fail closed until completed current-head owner review is verified
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUM: ${{ steps.identity.outputs.pr }}
+          REVIEW_REPO: ${{ github.repository }}
+          PR_BASE: ${{ steps.identity.outputs.base }}
+          PR_HEAD: ${{ steps.identity.outputs.head }}
+        run: node trusted/scripts/agy-pr-review.mjs failure --repo "$REVIEW_REPO" --pr "$PR_NUM" --base "$PR_BASE" --head "$PR_HEAD"
+      # No candidate commands, npm, tests, hooks or model calls. Read Git objects only.
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ steps.identity.outputs.head }}
+          path: candidate-data
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Independently reconstruct coverage and verify the owner-posted receipt
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUM: ${{ steps.identity.outputs.pr }}
+          REVIEW_REPO: ${{ github.repository }}
+          PR_BASE: ${{ steps.identity.outputs.base }}
+          PR_HEAD: ${{ steps.identity.outputs.head }}
+        run: node trusted/scripts/agy-pr-review.mjs verify --repo "$REVIEW_REPO" --pr "$PR_NUM" --base "$PR_BASE" --head "$PR_HEAD" --source candidate-data

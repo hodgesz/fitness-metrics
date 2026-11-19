@@ -8,6 +8,8 @@ Generation uses the operator's sign-in and never requires a CI credential.
 
 ## Review a PR
 
+GitHub requires `test` and `gemini-review` on `main`.
+
 Use Node 22.22.2 and the checksum-verified Antigravity executable. Work from a
 clean checkout of the exact base, with both commits available locally.
 

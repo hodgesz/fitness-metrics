@@ -1,7 +1,7 @@
 # Notes for agents working in this repo
 
-Read this before running anything. It exists because `codex exec review` cannot be re-prompted
-(`--base` refuses a prompt argument), so this file is the only steering a reviewer gets.
+Read this before running anything. Use [native Neon LOW PR review](docs/PR_REVIEW.md) and
+the current-head CI checks before merging.
 
 ## What this is
 
